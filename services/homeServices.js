@@ -1,5 +1,5 @@
 const handleIndex = async (req, res) => {
-    res.send("Hello World!");
+    res.send('Hello Maneger');
 }
 
 
