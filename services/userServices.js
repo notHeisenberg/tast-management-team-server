@@ -19,6 +19,22 @@ async function getAllUsers(req, res) {
   }
 }
 
+async function getUser(req, res) {
+  try {
+    const userCollection = await getUserCollection();
+    const userEmail = req.params.email; 
+
+    // Query the collection to find the user by ID
+    const user = await userCollection.findOne({ email: userEmail });
+
+    // Send the retrieved user as the response
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Error in GET request:", error);
+    res.status(500).send("Error retrieving user");
+  }
+}
+
 // Function to create a new user (for POST request)
 async function createUser(req, res) {
   try {
@@ -170,6 +186,7 @@ async function changeOrSetPassword(req, res) {
 
 module.exports = {
   getAllUsers,
+  getUser,
   createUser,
   updateUser,
   deleteUser,
