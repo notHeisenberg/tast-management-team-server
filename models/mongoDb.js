@@ -4,6 +4,7 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 
 let client;
 let userCollection;
+let channelCollection;
 
 async function connectToDatabase() {
   if (client && client.topology && client.topology.isConnected()) {
@@ -28,8 +29,9 @@ async function connectToDatabase() {
 
     const database = client.db("task-manager");
     userCollection = database.collection("users");
+    channelCollection = database.collection("channels");
 
-    return { userCollection };
+    return { userCollection, channelCollection };
   } catch (error) {
     console.error("Failed to connect to MongoDB:", error);
     throw error;
@@ -41,6 +43,10 @@ async function getUserCollection() {
   return userCollection;
 }
 
+async function getChannelCollection() {
+  const { channelCollection } = await connectToDatabase();
+  return channelCollection;
+}
 
 // This function can be used to explicitly close the connection if needed
 async function closeConnection() {
@@ -54,4 +60,5 @@ module.exports = {
   getUserCollection,
   closeConnection,
   ObjectId,
+  getChannelCollection,
 };
