@@ -57,6 +57,7 @@ const updateChannel = async (req, res) => {
         }
 
 
+        
         // Prepare the update query
         const updatedStudent = {
             $push: { // Use $push to add to the students array
