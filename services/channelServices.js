@@ -6,6 +6,30 @@ const show = async (req, res) => {
     res.send(result);
 }
 
+const channelByEmail = async (req, res) => {
+    try {
+        const channelConnection = await getChannelCollection();
+        const useremail = req.params.email;
+
+        // Query to find channels where the user is either a teacher or a student
+        const channels = await channelConnection.find({
+            $or: [
+                { "teachers.email": useremail },
+                { "students.email": useremail }
+            ]
+        }).toArray();
+        console.log(channels)
+
+        // Send the response
+        res.status(200).json(channels);
+    } catch (error) {
+        console.error("Error fetching channels by email:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }finally {
+        await closeConnection();
+    }
+};
+
 const createChannel = async (req, res) => {
     const channel = req.body;
     const channelConnection = await getChannelCollection();
@@ -51,13 +75,13 @@ const updateChannel = async (req, res) => {
         const emailExists =
             filteredChannel.teachers.some((teacher) => teacher.email === updatedchannel.students.email) ||
             filteredChannel.students.some((student) => student.email === updatedchannel.students.email);
-        
+
         if (emailExists) {
             return res.status(400).send({ message: "You are already joined" });
         }
 
 
-        
+
         // Prepare the update query
         const updatedStudent = {
             $push: { // Use $push to add to the students array
@@ -82,7 +106,7 @@ const updateChannel = async (req, res) => {
     } catch (error) {
         console.error('Error updating channel:', error);
         return res.status(500).send({ message: "Internal Server Error" });
-    } 
+    }
     finally {
         await closeConnection();
     }
@@ -92,4 +116,5 @@ module.exports = {
     createChannel,
     updateChannel,
     show,
+    channelByEmail,
 }
