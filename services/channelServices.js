@@ -18,7 +18,7 @@ const channelByEmail = async (req, res) => {
                 { "students.email": useremail }
             ]
         }).toArray();
-        console.log(channels)
+        // console.log(channels)
 
         // Send the response
         res.status(200).json(channels);
