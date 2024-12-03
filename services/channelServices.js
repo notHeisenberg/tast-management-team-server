@@ -6,6 +6,24 @@ const show = async (req, res) => {
     res.send(result);
 }
 
+const channelByCode = async (req, res) => {
+    try {
+        const channelConnection = await getChannelCollection();
+        const channelCode = req.params.channelCode;
+
+        const channel = await channelConnection.findOne({
+            "channelInfo.channelCode": channelCode
+        });
+        res.status(200).json(channel);
+    }
+    catch (error) {
+        console.error("Error fetching channel by code:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    } finally {
+        await closeConnection();
+    }
+}
+
 const channelByEmail = async (req, res) => {
     try {
         const channelConnection = await getChannelCollection();
@@ -25,7 +43,7 @@ const channelByEmail = async (req, res) => {
     } catch (error) {
         console.error("Error fetching channels by email:", error);
         res.status(500).json({ error: "Internal Server Error" });
-    }finally {
+    } finally {
         await closeConnection();
     }
 };
@@ -117,4 +135,5 @@ module.exports = {
     updateChannel,
     show,
     channelByEmail,
+    channelByCode,
 }
