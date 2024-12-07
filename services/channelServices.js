@@ -43,13 +43,12 @@ const channelByEmail = async (req, res) => {
     } catch (error) {
         console.error("Error fetching channels by email:", error);
         res.status(500).json({ error: "Internal Server Error" });
-    } finally {
-        await closeConnection();
     }
 };
 
 const createChannel = async (req, res) => {
     const channel = req.body;
+    console.log(channel)
     const channelConnection = await getChannelCollection();
 
     try {
@@ -130,10 +129,114 @@ const updateChannel = async (req, res) => {
     }
 }
 
+
+const createPost = async (req, res) => {
+    try {
+        const { channelCode } = req.params; // Extract channelCode from route params
+        const post = req.body; // Post data from the request body
+
+        const channelConnection = await getChannelCollection();
+
+        const channel = await channelConnection.findOne({
+            "channelInfo.channelCode": channelCode,
+        });
+
+        if (!channel) {
+            return res.status(404).send({ message: "Channel not found" });
+        }
+
+        const newPost = {
+            ...post, // Include all post data
+            timestamp: new Date().toISOString(), // Ensure timestamp is set
+            postCode: Math.random().toString(36).substring(2, 8).toUpperCase(), // Generate postCode
+        };
+
+        // Push the new post to the posts array of the channel
+        const updateResult = await channelConnection.updateOne(
+            { _id: channel._id },
+            { $push: { posts: newPost } }
+        );
+
+        if (updateResult.modifiedCount > 0) {
+            res.status(201).send({ message: "Post created successfully" });
+        } else {
+            res.status(500).send({ message: "Failed to create post" });
+        }
+    } catch (error) {
+        console.error("Error creating post:", error);
+        res.status(500).send({ message: "Internal Server Error" });
+    } finally {
+        await closeConnection();
+    }
+};
+
+const getPostByCode = async (req, res) => {
+    try {
+        const { channelCode, postCode } = req.params;
+
+        const channelCollection = await getChannelCollection();
+        const channel = await channelCollection.findOne({
+            "channelInfo.channelCode": channelCode,
+            "posts.postCode": postCode,
+        });
+
+        if (!channel) {
+            return res.status(404).json({ message: "Post or channel not found" });
+        }
+
+        const post = channel.posts.find((post) => post.postCode === postCode);
+        res.status(200).json(post);
+    } catch (error) {
+        console.error("Error fetching post by code:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+}
+
+const addCommentToPost = async (req, res) => {
+    try {
+        const { channelCode, postCode } = req.params;
+        const { author, image, content } = req.body;
+
+        if (!content.trim()) {
+            return res.status(400).json({ message: "Comment content cannot be empty." });
+        }
+
+        const channelCollection = await getChannelCollection();
+        const result = await channelCollection.updateOne(
+            {
+                "channelInfo.channelCode": channelCode,
+                "posts.postCode": postCode,
+            },
+            {
+                $push: {
+                    "posts.$.comments": {
+                        author,
+                        image: image || "https://robohash.org/default-user?set=set1&size=400x400",
+                        content,
+                        timestamp: new Date().toISOString(),
+                    },
+                },
+            }
+        );
+
+        if (result.modifiedCount > 0) {
+            res.status(201).json({ message: "Comment added successfully." });
+        } else {
+            res.status(404).json({ message: "Post or channel not found." });
+        }
+    } catch (error) {
+        console.error("Error adding comment:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
 module.exports = {
     createChannel,
     updateChannel,
     show,
     channelByEmail,
     channelByCode,
+    createPost,
+    getPostByCode,
+    addCommentToPost,
 }
