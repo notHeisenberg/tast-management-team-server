@@ -170,6 +170,28 @@ const createPost = async (req, res) => {
     }
 };
 
+const getPostByCode = async (req, res) => {
+    try {
+        const { channelCode, postCode } = req.params;
+
+        const channelCollection = await getChannelCollection();
+        const channel = await channelCollection.findOne({
+            "channelInfo.channelCode": channelCode,
+            "posts.postCode": postCode,
+        });
+
+        if (!channel) {
+            return res.status(404).json({ message: "Post or channel not found" });
+        }
+
+        const post = channel.posts.find((post) => post.postCode === postCode);
+        res.status(200).json(post);
+    } catch (error) {
+        console.error("Error fetching post by code:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+}
+
 const addCommentToPost = async (req, res) => {
     try {
         const { channelCode, postCode } = req.params;
@@ -215,5 +237,6 @@ module.exports = {
     channelByEmail,
     channelByCode,
     createPost,
+    getPostByCode,
     addCommentToPost,
 }
