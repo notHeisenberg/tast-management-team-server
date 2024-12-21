@@ -1,4 +1,4 @@
-const { createChannel, updateChannel, channelByEmail, channelByCode, createPost, addCommentToPost, getPostByCode, } = require("../services/channelServices");
+const { createChannel, updateChannel, channelByEmail, channelByCode, createPost, addCommentToPost, getPostByCode, submitAssignment, cancelSubmission, } = require("../services/channelServices");
 
 module.exports = {
     create: createChannel,
@@ -8,4 +8,6 @@ module.exports = {
     createPost: createPost,
     addComment: addCommentToPost,
     getPostDetails: getPostByCode,
+    submit:submitAssignment,
+    cancel:cancelSubmission,
 }

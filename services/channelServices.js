@@ -1,5 +1,12 @@
 const { getChannelCollection, closeConnection } = require("../models/mongoDb");
 
+const cloudinary = require("../config/cloudinaryConfig");
+const multer = require("multer");
+
+// Configure multer to use memory storage
+const upload = multer({ storage: multer.memoryStorage() });
+
+
 const show = async (req, res) => {
     const channelConnection = await getChannelCollection();
     const result = await channelConnection.find().toArray();
@@ -195,13 +202,36 @@ const getPostByCode = async (req, res) => {
 const addCommentToPost = async (req, res) => {
     try {
         const { channelCode, postCode } = req.params;
-        const { author, image, content } = req.body;
+        const { author, image, content, isPrivate = false } = req.body;
 
         if (!content.trim()) {
             return res.status(400).json({ message: "Comment content cannot be empty." });
         }
 
         const channelCollection = await getChannelCollection();
+
+        // Retrieve the post to get the creator
+        const channel = await channelCollection.findOne({
+            "channelInfo.channelCode": channelCode,
+            "posts.postCode": postCode,
+        });
+
+        if (!channel) {
+            return res.status(404).json({ message: "Post or channel not found." });
+        }
+
+        const post = channel.posts.find((post) => post.postCode === postCode);
+
+        if (!post) {
+            return res.status(404).json({ message: "Post not found." });
+        }
+
+        // Add the visibility array
+        const visibility = [author];
+        if (post.author.name) {
+            visibility.push(post.author.name);
+        }
+
         const result = await channelCollection.updateOne(
             {
                 "channelInfo.channelCode": channelCode,
@@ -214,19 +244,101 @@ const addCommentToPost = async (req, res) => {
                         image: image || "https://robohash.org/default-user?set=set1&size=400x400",
                         content,
                         timestamp: new Date().toISOString(),
+                        isPrivate, // Add the privacy flag
+                        visibility, // Add visibility array
                     },
                 },
             }
         );
 
         if (result.modifiedCount > 0) {
-            res.status(201).json({ message: "Comment added successfully." });
+            res.status(201).json({ message: `Comment added successfully${isPrivate ? " (Private)" : ""}.` });
         } else {
             res.status(404).json({ message: "Post or channel not found." });
         }
     } catch (error) {
         console.error("Error adding comment:", error);
         res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+// Function to handle file upload and save to MongoDB
+const submitAssignment = async (req, res) => {
+    try {
+        const { channelCode, postCode } = req.params;
+        const file = req.file;
+
+        if (!file) {
+            return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const channelCollection = await getChannelCollection();
+
+        // Upload file to Cloudinary
+        const cloudinaryResult = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+                { resource_type: "auto", folder: "assignments" },
+                (error, result) => {
+                    if (error) return reject(error);
+                    resolve(result);
+                }
+            );
+            uploadStream.end(file.buffer);
+        });
+
+        // Create the submission object
+        const submission = {
+            student: req.body.student || "Unknown Student",
+            fileName: file.originalname,
+            fileUrl: cloudinaryResult.secure_url,
+            uploadedAt: new Date().toISOString(),
+        };
+
+        // Save submission to MongoDB
+        const result = await channelCollection.updateOne(
+            { "channelInfo.channelCode": channelCode, "posts.postCode": postCode },
+            { $push: { "posts.$.submissions": submission } }
+        );
+
+        if (result.modifiedCount > 0) {
+            res.status(200).json({
+                message: "Assignment submitted successfully",
+                submission,
+            });
+        } else {
+            res.status(404).json({ message: "Failed to save submission in database" });
+        }
+    } catch (error) {
+        console.error("Error uploading assignment:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    } finally {
+        await closeConnection();
+    }
+};
+
+const cancelSubmission = async (req, res) => {
+    try {
+        const { channelCode, postCode } = req.params;
+        const { student } = req.body; // Student's name or unique identifier
+
+        const channelCollection = await getChannelCollection();
+
+        // Remove the submission for the specific student
+        const result = await channelCollection.updateOne(
+            { "channelInfo.channelCode": channelCode, "posts.postCode": postCode },
+            { $pull: { "posts.$.submissions": { student: student } } }
+        );
+
+        if (result.modifiedCount > 0) {
+            res.status(200).json({ message: "Submission canceled successfully" });
+        } else {
+            res.status(404).json({ message: "No submission found to cancel" });
+        }
+    } catch (error) {
+        console.error("Error canceling submission:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    } finally {
+        await closeConnection();
     }
 };
 
@@ -239,4 +351,7 @@ module.exports = {
     createPost,
     getPostByCode,
     addCommentToPost,
+    upload,
+    submitAssignment,
+    cancelSubmission,
 }
